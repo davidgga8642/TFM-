@@ -2,6 +2,7 @@ import express from 'express'
 import bcrypt from 'bcrypt'
 import crypto from 'crypto'
 import { q } from './db.js'
+import { sendResetEmail } from './mailer.js'
 
 export const auth = express.Router()
 
@@ -29,10 +30,23 @@ auth.post('/forgot', async (req,res)=>{
   if(!email) return res.status(400).json({ error: 'Email requerido' })
   const user = await q.get(`SELECT * FROM users WHERE email=?`, [email])
   if(!user) return res.status(404).json({ error: 'No existe usuario con ese email' })
+  
   const token = crypto.randomBytes(24).toString('hex')
   const expires_at = new Date(Date.now()+1000*60*60).toISOString()
   await q.run(`INSERT INTO password_resets(user_id,token,expires_at) VALUES(?,?,?)`, [user.id, token, expires_at])
-  res.json({ ok:true, preview_url: `reset.html?token=${token}` })
+  
+  // Construir el link de reset
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+  const host = process.env.APP_HOST || 'localhost:3000'
+  const resetLink = `${protocol}://${host}/reset.html?token=${token}`
+  
+  try{
+    const result = await sendResetEmail(email, token, resetLink)
+    res.json({ ok:true, preview_url: result.preview_url || resetLink })
+  }catch(err){
+    console.error('Error sending email:', err)
+    res.status(500).json({ error: 'No se pudo enviar el email' })
+  }
 })
 
 auth.post('/reset', async (req,res)=>{

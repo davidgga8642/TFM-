@@ -32,7 +32,11 @@
         if(!email) return alert('Introduce tu email')
         try{
           const r = await api('api/auth/forgot', { method:'POST', body: JSON.stringify({ email }) })
-          document.getElementById('msg').textContent = '✅ Enlace enviado. Revisa tu correo o haz clic en el siguiente: ' + (r.preview_url || 'reset.html')
+          let msg = '✅ Email enviado correctamente. Revisa tu bandeja de entrada.'
+          if(r.preview_url){
+            msg += '<br/><br/>📧 <strong>Vista previa de desarrollo:</strong><br/><a href="' + r.preview_url + '" target="_blank" style="color:blue; text-decoration:underline;">Ver email en Ethereal</a>'
+          }
+          document.getElementById('msg').innerHTML = msg
           document.getElementById('msg').style.color = 'green'
         }catch(e){ 
           if(e.message.includes('No existe usuario')) {

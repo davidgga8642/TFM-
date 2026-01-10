@@ -5,6 +5,7 @@ import helmet from 'helmet'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { init } from './db.js'
+import { initMailer } from './mailer.js'
 import { auth } from './routes-auth.js'
 import { company, employees } from './routes-company.js'
 import { timesheets } from './routes-timesheets.js'
@@ -42,8 +43,10 @@ app.use('/api/finance', finance)
 app.use('/api/vacations', vacations)
 
 const PORT = process.env.PORT || 3000
-init().then(()=>{
+init().then(async ()=>{
+  await initMailer()
   app.listen(PORT, ()=> console.log('✅ API/WEB en http://localhost:'+PORT))
 }).catch(err=>{
   console.error('Error init DB', err); process.exit(1)
 })
+
