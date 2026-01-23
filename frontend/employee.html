@@ -38,9 +38,9 @@
           <h2>Fichaje con geolocalización</h2>
           <div class="actions">
             <button id="startBtn" class="btn primary">Iniciar jornada</button>
-            <button id="breakStartBtn" class="btn" disabled>Inicio descanso</button>
-            <button id="breakEndBtn" class="btn" disabled>Fin descanso</button>
-            <button id="endBtn" class="btn" disabled>Finalizar jornada</button>
+            <button id="breakStartBtn" class="btn" style="display:none">Inicio descanso</button>
+            <button id="breakEndBtn" class="btn" style="display:none">Fin descanso</button>
+            <button id="endBtn" class="btn" style="display:none">Finalizar jornada</button>
             <span id="geoMsg" class="small"></span>
           </div>
           <p class="help">Se solicitará la ubicación solo al iniciar y finalizar (radio válido 200 m respecto a la empresa).</p>
@@ -54,6 +54,15 @@
             <input id="reqStartTime" type="time" class="input" />
             <label>Hora de fin</label>
             <input id="reqEndTime" type="time" class="input" />
+            <div style="margin-top:8px">
+              <label><input id="reqHasBreak" type="checkbox" /> Ha habido descanso</label>
+            </div>
+            <div id="reqBreakFields" style="display:none">
+              <label>Hora de inicio de descanso</label>
+              <input id="reqBreakStart" type="time" class="input" />
+              <label>Hora de fin de descanso</label>
+              <input id="reqBreakEnd" type="time" class="input" />
+            </div>
             <button id="reqSave" class="btn primary">Solicitar jornada</button>
             <p class="help">Solicita una jornada manual que será aprobada por el administrador.</p>
           </div>
@@ -70,7 +79,7 @@
         <div class="card">
           <h2>Mis solicitudes pendientes</h2>
           <table class="table">
-            <thead><tr><th>Fecha</th><th>Hora inicio</th><th>Hora fin</th><th>Estado</th><th>Razón</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Hora inicio</th><th>Hora fin</th><th>Inicio descanso</th><th>Fin descanso</th><th>Estado</th><th>Razón</th></tr></thead>
             <tbody id="reqBody"></tbody>
           </table>
         </div>

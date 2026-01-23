@@ -18,7 +18,7 @@ company.post('/location', requireAuth, requireRole('ADMIN'), async (req,res)=>{
 
 export const employees = express.Router()
 employees.get('/', requireAuth, requireRole('ADMIN'), async (req,res)=>{
-  const rows = await q.all(`SELECT e.id, u.email, e.overtime_rate, e.allow_diets, e.allow_transport, e.allow_lodging, e.salary, e.daily_hours, e.weekly_hours, e.vacation_days, e.vacation_days_used, e.vacation_year, e.dni, e.birthdate, e.phone, e.contact_email, e.position, e.contract_type, e.pay_installments FROM employees e JOIN users u ON u.id=e.user_id ORDER BY e.id DESC`)
+  const rows = await q.all(`SELECT e.id, u.id as user_id, u.active, u.email, e.overtime_rate, e.allow_diets, e.allow_transport, e.allow_lodging, e.salary, e.daily_hours, e.weekly_hours, e.vacation_days, e.vacation_days_used, e.vacation_year, e.dni, e.birthdate, e.phone, e.contact_email, e.position, e.contract_type, e.pay_installments FROM employees e JOIN users u ON u.id=e.user_id ORDER BY e.id DESC`)
   res.json({ employees: rows })
 })
 employees.get('/me', requireAuth, async (req,res)=>{
@@ -57,5 +57,23 @@ employees.patch('/:id', requireAuth, requireRole('ADMIN'), async (req,res)=>{
   if(!Number.isFinite(id)) return res.status(400).json({ error:'ID inválido' })
   await q.run(`UPDATE employees SET overtime_rate=?, allow_diets=?, allow_transport=?, allow_lodging=?, salary=?, daily_hours=?, weekly_hours=?, vacation_days=? WHERE id=?`,
     [Number(overtime_rate??15), !!allow_diets?1:0, !!allow_transport?1:0, !!allow_lodging?1:0, Number(salary??0), Number(daily_hours??8), Number(weekly_hours??40), Number(vacation_days??22), id])
+  res.json({ ok:true })
+})
+
+employees.patch('/:id/deactivate', requireAuth, requireRole('ADMIN'), async (req,res)=>{
+  const id = Number(req.params.id)
+  if(!Number.isFinite(id)) return res.status(400).json({ error:'ID inválido' })
+  const emp = await q.get(`SELECT user_id FROM employees WHERE id=?`, [id])
+  if(!emp) return res.status(404).json({ error:'Empleado no encontrado' })
+  await q.run(`UPDATE users SET active=0 WHERE id=?`, [emp.user_id])
+  res.json({ ok:true })
+})
+
+employees.patch('/:id/activate', requireAuth, requireRole('ADMIN'), async (req,res)=>{
+  const id = Number(req.params.id)
+  if(!Number.isFinite(id)) return res.status(400).json({ error:'ID inválido' })
+  const emp = await q.get(`SELECT user_id FROM employees WHERE id=?`, [id])
+  if(!emp) return res.status(404).json({ error:'Empleado no encontrado' })
+  await q.run(`UPDATE users SET active=1 WHERE id=?`, [emp.user_id])
   res.json({ ok:true })
 })

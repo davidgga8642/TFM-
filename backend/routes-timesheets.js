@@ -104,11 +104,11 @@ timesheets.get('/overtime/summary', requireAuth, async (req,res)=>{
 
 // Timesheet Requests (Solicitudes de jornada)
 timesheets.post('/requests', requireAuth, requireRole('WORKER'), async (req,res)=>{
-  const { date, start_time, end_time } = req.body || {}
+  const { date, start_time, end_time, break_start, break_end } = req.body || {}
   if(!date || !start_time || !end_time) return res.status(400).json({ error:'Faltan campos' })
   const created_at = new Date().toISOString()
-  await q.run(`INSERT INTO timesheet_requests(user_id,date,start_time,end_time,created_at) VALUES(?,?,?,?,?)`,
-    [req.session.user.id, date, start_time, end_time, created_at])
+  await q.run(`INSERT INTO timesheet_requests(user_id,date,start_time,end_time,break_start,break_end,created_at) VALUES(?,?,?,?,?,?,?)`,
+    [req.session.user.id, date, start_time, end_time, break_start || null, break_end || null, created_at])
   res.json({ ok:true, message:'Solicitud de jornada creada' })
 })
 
@@ -119,6 +119,8 @@ timesheets.get('/requests/my', requireAuth, requireRole('WORKER'), async (req,re
     date: r.date,
     start_time: r.start_time,
     end_time: r.end_time,
+    break_start: r.break_start,
+    break_end: r.break_end,
     status: r.status,
     reason: r.reason,
     created_at: r.created_at
@@ -135,6 +137,8 @@ timesheets.get('/requests/pending', requireAuth, requireRole('ADMIN'), async (re
     date: r.date,
     start_time: r.start_time,
     end_time: r.end_time,
+    break_start: r.break_start,
+    break_end: r.break_end,
     created_at: r.created_at
   }))
   res.json({ requests: mapped })
@@ -148,10 +152,12 @@ timesheets.post('/requests/:id/approve', requireAuth, requireRole('ADMIN'), asyn
   // Convertir start_time y end_time a formato ISO completo
   const startISO = `${request.date}T${request.start_time}:00`
   const endISO = `${request.date}T${request.end_time}:00`
+  const breakStartISO = request.break_start ? `${request.date}T${request.break_start}:00` : null
+  const breakEndISO = request.break_end ? `${request.date}T${request.break_end}:00` : null
   
   // Crear la jornada en timesheets
-  await q.run(`INSERT INTO timesheets(user_id,date,start_time,end_time) VALUES(?,?,?,?)`,
-    [request.user_id, request.date, startISO, endISO])
+  await q.run(`INSERT INTO timesheets(user_id,date,start_time,end_time,break_start,break_end) VALUES(?,?,?,?,?,?)`,
+    [request.user_id, request.date, startISO, endISO, breakStartISO, breakEndISO])
   
   // Actualizar estado de la solicitud
   await q.run(`UPDATE timesheet_requests SET status='ACEPTADO', approved_by=? WHERE id=?`, [req.session.user.id, id])

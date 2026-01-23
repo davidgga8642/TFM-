@@ -154,3 +154,51 @@ David García García
 ---
 
 **Repositorio:** https://github.com/davidgga8642/TFM-
+
+---
+
+## 🗓️ Cambios recientes (23-01-2026)
+David Gómez García-Arias
+### Qué se ha cambiado
+- Dashboard KPIs:
+	- Ingresos totales: ahora suman el importe de las facturas emitidas.
+	- Gastos: ahora suman salarios de empleados activos + gastos aprobados.
+	- Resultado neto: ingresos − gastos.
+- Gráfico "Ingresos vs Gastos":
+	- Ingresos por mes: suma de facturas del mes.
+	- Gastos por mes: salarios de empleados activos en ese mes + gastos aprobados del mes.
+- Gráfico "Horas extra acumuladas":
+	- Se calcula por empleado y por mes las horas extra (horas trabajadas − horas diarias contratadas), restando tiempo de descanso.
+- Cifrado de tickets (PDF/imagenes):
+	- Cifrado en reposo (AES-256-GCM) al subir.
+	- Descifrado bajo demanda solo para usuarios ADMIN/CEO.
+	- Compatibilidad con archivos antiguos sin cifrar.
+- Solicitudes de jornada: campos opcionales de descanso (`break_start`, `break_end`) y visualización en admin/empleado.
+
+### Cómo se ha implementado
+- Backend
+	- `backend/routes-finance.js`:
+		- Se corrige el cálculo de horas extra utilizando timestamps ISO (`start_time`, `end_time`, `break_start`, `break_end`) y se computa el exceso sobre `daily_hours` por día, agregando por empleado/mes.
+		- Se expone `series.overtime_by_employee` y `series.invoice_incomes` para el frontend.
+	- `backend/routes-tickets.js`:
+		- Se añade cifrado al subir archivos con AES-256-GCM; se guarda `.enc` y se elimina el archivo en claro.
+		- El endpoint de descarga descifra en memoria para ADMIN/CEO y mantiene fallback para archivos en claro anteriores.
+	- `backend/db.js`:
+		- Se asegura la existencia de columnas `break_start` y `break_end` en `timesheet_requests`.
+		- Se añaden columnas `hire_date` y `termination_date` en `employees` para poder computar salarios por mes según actividad.
+- Frontend
+	- `frontend/js/admin.js`:
+		- KPIs: ingresos = facturas; gastos = salarios activos + tickets aprobados; neto = ingresos − gastos.
+		- Gráfico ch1: ingresos/gastos mensuales calculados desde invoices/tickets + salarios activos por mes.
+		- Gráfico ch3: series por empleado/mes con horas extra.
+	- `frontend/admin.html` y `frontend/employee.html`:
+		- Columnas de descanso visibles en tablas de solicitudes.
+
+### Notas de operación
+- Acceso a PDFs de gastos:
+	- Solo ADMIN/CEO puede descargar mediante `GET /api/tickets/:id/file`.
+	- Archivos nuevos están cifrados; los antiguos se sirven de forma segura solo para ADMIN.
+- Para ver el dashboard actualizado:
+	- Iniciar backend (`npm start`) y acceder a `http://localhost:3000/admin.html`.
+	- Usar usuario ADMIN/CEO para acceder a gastos y gráficas financieras.
+

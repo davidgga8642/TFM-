@@ -1,0 +1,21 @@
+{
+  "user": "ylfdsd7ttaaf3q4w@ethereal.email",
+  "pass": "C2u11VjckWP28DGNEd",
+  "smtp": {
+    "host": "smtp.ethereal.email",
+    "port": 587,
+    "secure": false
+  },
+  "imap": {
+    "host": "imap.ethereal.email",
+    "port": 993,
+    "secure": true
+  },
+  "pop3": {
+    "host": "pop3.ethereal.email",
+    "port": 995,
+    "secure": true
+  },
+  "web": "https://ethereal.email",
+  "mxEnabled": false
+}

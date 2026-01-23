@@ -32,9 +32,16 @@
         if(!email) return alert('Introduce tu email')
         try{
           const r = await api('api/auth/forgot', { method:'POST', body: JSON.stringify({ email }) })
-          let msg = '✅ Email enviado correctamente. Revisa tu bandeja de entrada.'
-          if(r.preview_url){
-            msg += '<br/><br/>📧 <strong>Vista previa de desarrollo:</strong><br/><a href="' + r.preview_url + '" target="_blank" style="color:blue; text-decoration:underline;">Ver email en Ethereal</a>'
+          let msg = '✅ Email enviado correctamente.'
+          if(r.preview_url && r.ethereal_user){
+            // Es Ethereal (desarrollo)
+            msg += '<br/><br/><strong style="color:#17a2b8;">📧 Credenciales Ethereal:</strong><br/>'
+            msg += 'Email: <code style="background:#f8f9fa; padding:2px 6px; border-radius:3px;">' + r.ethereal_user + '</code><br/>'
+            msg += 'Contraseña: <code style="background:#f8f9fa; padding:2px 6px; border-radius:3px;">' + r.ethereal_pass + '</code><br/><br/>'
+            msg += '<a href="https://ethereal.email/login" target="_blank" style="color:#17a2b8; text-decoration:none; font-weight:bold;">👉 Abre tu bandeja en Ethereal aquí</a><br/>'
+            msg += '<a href="' + r.preview_url + '" target="_blank" style="color:blue; text-decoration:underline; display:inline-block; margin-top:8px;">Ver este email directamente</a>'
+          } else {
+            msg += ' Revisa tu bandeja de entrada.'
           }
           document.getElementById('msg').innerHTML = msg
           document.getElementById('msg').style.color = 'green'

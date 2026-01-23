@@ -2,6 +2,7 @@ import express from 'express'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
+import crypto from 'crypto'
 import { fileURLToPath } from 'url'
 import { q } from './db.js'
 import { requireAuth, requireRole } from './middleware.js'
@@ -27,6 +28,45 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 102
 
 export const tickets = express.Router()
 
+// --- Encryption helpers (AES-256-GCM) ---
+const keyFile = path.join(__dirname, '.tickets-key')
+function getTicketsKey(){
+  try{
+    if(!fs.existsSync(keyFile)){
+      const key = crypto.randomBytes(32)
+      fs.writeFileSync(keyFile, key.toString('base64'))
+    }
+    const b64 = fs.readFileSync(keyFile, 'utf8')
+    return Buffer.from(b64, 'base64')
+  }catch(e){
+    // Fallback dev key
+    return crypto.createHash('sha256').update('TFM-DEMO-TICKETS-KEY').digest()
+  }
+}
+function encryptFile(plainPath){
+  const key = getTicketsKey()
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
+  const data = fs.readFileSync(plainPath)
+  const enc = Buffer.concat([cipher.update(data), cipher.final()])
+  const tag = cipher.getAuthTag()
+  const out = Buffer.concat([iv, tag, enc])
+  const encPath = plainPath + '.enc'
+  fs.writeFileSync(encPath, out)
+  return encPath
+}
+function decryptFile(encPath){
+  const key = getTicketsKey()
+  const data = fs.readFileSync(encPath)
+  const iv = data.slice(0,12)
+  const tag = data.slice(12,28)
+  const enc = data.slice(28)
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv)
+  decipher.setAuthTag(tag)
+  const dec = Buffer.concat([decipher.update(enc), decipher.final()])
+  return dec
+}
+
 // Worker upload (with permission checks)
 tickets.post('/', requireAuth, requireRole('WORKER'), upload.single('file'), async (req,res)=>{
   const { category, amount } = req.body || {}
@@ -35,7 +75,11 @@ tickets.post('/', requireAuth, requireRole('WORKER'), upload.single('file'), asy
   const emp = await q.get(`SELECT allow_diets, allow_transport FROM employees WHERE user_id=?`, [req.session.user.id])
   if(category==='DIETAS' && !emp?.allow_diets) return res.status(403).json({ error:'No autorizado para DIETAS' })
   if(category==='TRANSPORTE' && !emp?.allow_transport) return res.status(403).json({ error:'No autorizado para TRANSPORTE' })
-  const file_path = req.file.path, file_mime = req.file.mimetype
+  const file_mime = req.file.mimetype
+  // Encrypt file at rest
+  const encPath = encryptFile(req.file.path)
+  try{ fs.unlinkSync(req.file.path) }catch{}
+  const file_path = encPath
   const created_at = new Date().toISOString()
   await q.run(`INSERT INTO tickets(user_id,created_at,category,amount,status,reason,file_path,file_mime) VALUES(?,?,?,?,?,?,?,?)`,
     [req.session.user.id, created_at, category || null, amountN, 'PENDIENTE', null, file_path, file_mime])
@@ -78,6 +122,18 @@ tickets.get('/:id/file', requireAuth, requireRole('ADMIN'), async (req,res)=>{
   const ticket = await q.get(`SELECT file_path, file_mime FROM tickets WHERE id=?`, [id])
   if(!ticket) return res.status(404).json({ error:'Ticket no encontrado' })
   if(!fs.existsSync(ticket.file_path)) return res.status(404).json({ error:'Archivo no encontrado' })
-  res.setHeader('Content-Type', ticket.file_mime)
-  res.sendFile(path.resolve(ticket.file_path))
+  // Decrypt and send
+  try{
+    if(ticket.file_path.endsWith('.enc')){
+      const buf = decryptFile(ticket.file_path)
+      res.setHeader('Content-Type', ticket.file_mime)
+      return res.send(buf)
+    } else {
+      // Backwards-compatible: serve plaintext file stored previously
+      res.setHeader('Content-Type', ticket.file_mime)
+      return res.sendFile(path.resolve(ticket.file_path))
+    }
+  }catch(e){
+    res.status(500).json({ error:'No se pudo descifrar el archivo' })
+  }
 })

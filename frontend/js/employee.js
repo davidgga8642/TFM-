@@ -6,7 +6,7 @@ const sections = { dashboard: document.querySelector('#tab-dashboard'), time: do
 tabs.forEach(t=> t.addEventListener('click', ()=> activateTab(t.dataset.tab)))
 function activateTab(id){ tabs.forEach(t=> t.classList.toggle('active', t.dataset.tab===id)); const sectionId = (id==='timesheets')? 'time' : id; for(const k in sections){ sections[k].style.display = (k===sectionId)? 'block':'none' } if(sectionId==='dashboard') loadDashboard(); if(id==='time' || id==='timesheets') loadTimesheets(); if(sectionId==='tickets') listTickets(); if(sectionId==='vacations') loadVacations(); }
 
-async function init(){ const user=await me(); if(!user || user.role!=='WORKER'){ location.href='index.html'; return } who.textContent = `${user.email} • WORKER`; document.getElementById('startBtn').addEventListener('click', startDay); document.getElementById('breakStartBtn').addEventListener('click', breakStart); document.getElementById('breakEndBtn').addEventListener('click', breakEnd); document.getElementById('endBtn').addEventListener('click', endDay); document.getElementById('tSave').addEventListener('click', saveTicket); document.getElementById('reqSave').addEventListener('click', saveRequest); document.getElementById('vacSave').addEventListener('click', saveVacation); loadTimesheets(); loadDashboard(); loadRequests(); updateButtonStates();
+async function init(){ const user=await me(); if(!user || user.role!=='WORKER'){ location.href='index.html'; return } who.textContent = `${user.email} • WORKER`; document.getElementById('startBtn').addEventListener('click', startDay); document.getElementById('breakStartBtn').addEventListener('click', breakStart); document.getElementById('breakEndBtn').addEventListener('click', breakEnd); document.getElementById('endBtn').addEventListener('click', endDay); document.getElementById('tSave').addEventListener('click', saveTicket); document.getElementById('reqSave').addEventListener('click', saveRequest); document.getElementById('vacSave').addEventListener('click', saveVacation); document.getElementById('reqHasBreak').addEventListener('change', toggleBreakFields); loadTimesheets(); loadDashboard(); loadRequests(); updateButtonStates();
   try{ const meEmp = await api('api/employees/me'); const s = document.getElementById('tCat'); s.innerHTML=''; if(meEmp.employee.allow_transport) s.innerHTML += '<option value="TRANSPORTE">Transporte</option>'; if(meEmp.employee.allow_diets) s.innerHTML += '<option value="DIETAS">Dietas</option>'; if(meEmp.employee.allow_lodging) s.innerHTML += '<option value="ALOJAMIENTO">Alojamiento</option>'; s.innerHTML += '<option value="OTROS">Otros</option>'; }catch(e){} }
 init().catch(e=> alert(e.message))
 
@@ -25,23 +25,23 @@ async function updateButtonStates(){
     const openTimesheet = r.timesheets.find(t=> t.date === today && !t.end_time)
     
     if(!openTimesheet){
-      // No hay jornada abierta: solo "Iniciar jornada" habilitado
-      startBtn.disabled = false
-      breakStartBtn.disabled = true
-      breakEndBtn.disabled = true
-      endBtn.disabled = true
+      // No hay jornada abierta: solo "Iniciar jornada" visible
+      startBtn.style.display = 'inline-block'
+      breakStartBtn.style.display = 'none'
+      breakEndBtn.style.display = 'none'
+      endBtn.style.display = 'none'
     } else if(openTimesheet.break_start && !openTimesheet.break_end){
-      // Hay descanso iniciado: solo "Fin descanso" habilitado
-      startBtn.disabled = true
-      breakStartBtn.disabled = true
-      breakEndBtn.disabled = false
-      endBtn.disabled = true
+      // Hay descanso iniciado: solo "Fin descanso" visible
+      startBtn.style.display = 'none'
+      breakStartBtn.style.display = 'none'
+      breakEndBtn.style.display = 'inline-block'
+      endBtn.style.display = 'none'
     } else {
-      // Hay jornada abierta sin descanso: solo "Inicio descanso" y "Finalizar jornada"
-      startBtn.disabled = true
-      breakStartBtn.disabled = false
-      breakEndBtn.disabled = true
-      endBtn.disabled = false
+      // Hay jornada abierta sin descanso: solo "Inicio descanso" y "Finalizar jornada" visibles
+      startBtn.style.display = 'none'
+      breakStartBtn.style.display = 'inline-block'
+      breakEndBtn.style.display = 'none'
+      endBtn.style.display = 'inline-block'
     }
   }catch(e){
     console.error('Error al actualizar estado de botones:', e)
@@ -73,6 +73,16 @@ async function saveTicket(){
 }
 async function listTickets(){ const r=await api('api/tickets/my'); const tbody=document.querySelector('#tTable tbody'); tbody.innerHTML=''; r.tickets.forEach(t=>{ const tr=document.createElement('tr'); tr.innerHTML=`<td>${new Date(t.created_at).toLocaleString()}</td><td>${t.category||'-'}</td><td>${fmtMoney(t.amount)}</td><td>${t.file_mime}</td><td>${t.status}${t.reason? ' ('+t.reason+')':''}</td>`; tbody.appendChild(tr) }) }
 
+function toggleBreakFields(){
+  const hasBreak = document.getElementById('reqHasBreak').checked
+  const breakFields = document.getElementById('reqBreakFields')
+  breakFields.style.display = hasBreak ? 'block' : 'none'
+  if(!hasBreak){
+    document.getElementById('reqBreakStart').value = ''
+    document.getElementById('reqBreakEnd').value = ''
+  }
+}
+
 async function loadDashboard(){
   const ts = await api('api/timesheets/my')
   const totalExtra = ts.timesheets.reduce((a,t)=> a + (t.overtime||0), 0)
@@ -101,15 +111,28 @@ async function saveRequest(){
   const date = document.getElementById('reqDate').value
   const startTime = document.getElementById('reqStartTime').value
   const endTime = document.getElementById('reqEndTime').value
+  const hasBreak = document.getElementById('reqHasBreak').checked
+  const breakStart = document.getElementById('reqBreakStart').value
+  const breakEnd = document.getElementById('reqBreakEnd').value
   
   if(!date || !startTime || !endTime) return alert('Completa todos los campos')
+  if(hasBreak && (!breakStart || !breakEnd)) return alert('Completa las horas de descanso')
   
   try{
-    const r = await api('api/timesheets/requests', { method:'POST', body: JSON.stringify({ date, start_time: startTime, end_time: endTime })})
+    const payload = { date, start_time: startTime, end_time: endTime }
+    if(hasBreak){
+      payload.break_start = breakStart
+      payload.break_end = breakEnd
+    }
+    const r = await api('api/timesheets/requests', { method:'POST', body: JSON.stringify(payload)})
     alert('Solicitud creada')
     document.getElementById('reqDate').value = ''
     document.getElementById('reqStartTime').value = ''
     document.getElementById('reqEndTime').value = ''
+    document.getElementById('reqHasBreak').checked = false
+    document.getElementById('reqBreakStart').value = ''
+    document.getElementById('reqBreakEnd').value = ''
+    toggleBreakFields()
     loadRequests()
   }catch(e){
     alert(e.message)
@@ -126,7 +149,7 @@ async function loadRequests(){
     pendingOrRejected.forEach(req=>{
       const tr = document.createElement('tr')
       const statusColor = req.status === 'RECHAZADO' ? 'red' : 'orange'
-      tr.innerHTML = `<td>${ymdToDmy(req.date)}</td><td>${req.start_time}</td><td>${req.end_time}</td><td style="color:${statusColor}">${req.status}</td><td>${req.reason || ''}</td>`
+      tr.innerHTML = `<td>${ymdToDmy(req.date)}</td><td>${req.start_time}</td><td>${req.end_time}</td><td>${!req.break_start ? '—' : req.break_start}</td><td>${!req.break_end ? '—' : req.break_end}</td><td style="color:${statusColor}">${req.status}</td><td>${req.reason || ''}</td>`
       tbody.appendChild(tr)
     })
     // Recargar también las jornadas y el dashboard para mostrar las solicitudes aceptadas

@@ -19,7 +19,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="dashboard">Dashboard</button>
         <button class="tab" data-tab="employees">Empleados</button>
-        <button class="tab" data-tab="finance">Finanzas</button>
+        <button class="tab" data-tab="invoices">Facturas emitidas</button>
         <button class="tab" data-tab="expenses">Gastos</button>
         <button class="tab" data-tab="requests">Solicitudes jornada</button>
         <button class="tab" data-tab="vacations">Solicitudes vacaciones</button>
@@ -55,65 +55,82 @@
             <h2>Acciones</h2>
             <a class="btn" href="admin-employee-new.html">Crear empleado</a>
           </div>
-          <div class="card">
+          <div class="card" style="grid-column: span 2">
             <h2>Empleados</h2>
             <table class="table" id="empTable">
-              <thead><tr><th>Email</th><th>Tarifa OT</th><th>Salario</th><th>Permisos</th></tr></thead>
+              <thead><tr><th>Email</th><th>Tarifa OT</th><th>Salario</th><th>Permisos</th><th>Estado</th><th>Acciones</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
         </div>
       </section>
 
-      <!-- Finance -->
-      <section id="tab-finance" style="display:none">
-        <div class="grid grid-2">
-          <div class="card">
-            <h2>Nuevo registro financiero</h2>
-            <div class="vertical">
-              <label>Mes (YYYY-MM)</label>
-              <input id="fMonth" class="input" placeholder="2025-12" />
-              <label>País</label>
-              <select id="fCountry" class="input"></select>
-              <label>Ingresos</label>
-              <input id="fInc" class="input" type="number" step="0.01" />
-              <label>Gastos</label>
-              <input id="fExp" class="input" type="number" step="0.01" />
-              <label>Salarios</label>
-              <input id="fSal" class="input" type="number" step="0.01" />
-              <button id="fSave" class="btn primary">Calcular y guardar</button>
-              <p class="help warning">“Los cálculos mostrados son orientativos y no sustituyen el asesoramiento fiscal profesional.”</p>
-              <pre id="fResult" class="small"></pre>
-            </div>
-          </div>
-          <div class="card">
-            <h2>Histórico</h2>
-            <table class="table" id="fTable">
-              <thead><tr><th>Mes</th><th>País</th><th>Ingresos</th><th>Gastos</th><th>Salarios</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-      </section>
 
       <!-- Expenses -->
       <section id="tab-expenses" style="display:none">
         <div class="card">
           <h2>Revisión de gastos de empleados</h2>
-          
+          <div class="grid" style="margin-bottom:8px">
+            <div>
+              <label>Filtro estado</label>
+              <select id="expFilter" class="input" style="max-width:200px">
+                <option value="">Todos</option>
+                <option value="PENDIENTE" selected>Pendiente</option>
+                <option value="RECHAZADO">Rechazado</option>
+              </select>
+              
+              <button id="expLoad" class="btn">Recargar</button>
+            </div>
+          </div>
           <table class="table" id="expTable">
             <thead><tr><th>ID</th><th>Fecha</th><th>Empleado</th><th>Categoría</th><th>Importe</th><th>Estado</th><th>PDF</th><th>Acciones</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
+        <div class="card" style="margin-top:12px">
+          <h2>Gastos aceptados</h2>
+          <table class="table" id="expApprovedTable">
+            <thead><tr><th>ID</th><th>Fecha</th><th>Empleado</th><th>Categoría</th><th>Importe</th><th>PDF</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
+
+      <!-- Invoices -->
+      
+      <section id="tab-invoices" style="display:none">
+        <div class="grid grid-2">
+          <div class="card">
+            <h2>Registrar factura emitida</h2>
+            <div class="vertical">
+              <label>Cliente</label>
+              <input id="invClient" class="input" placeholder="Cliente" />
+              <label>Importe cobrado</label>
+              <input id="invAmount" class="input" type="number" step="0.01" />
+              <label>Fecha de cobro (mes)</label>
+              <input id="invMonth" class="input" type="month" />
+              <label>Factura (PDF)</label>
+              <input id="invFile" class="input" type="file" accept="application/pdf" />
+              <button id="invSave" class="btn primary">Guardar factura</button>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Facturas emitidas</h2>
+            <table class="table" id="invTable">
+              <thead><tr><th>Cliente</th><th>Mes</th><th>Importe</th><th>Creada</th><th>PDF</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+     
 
       <!-- Solicitudes de jornada -->
       <section id="tab-requests" style="display:none">
         <div class="card">
           <h2>Solicitudes de jornada pendientes</h2>
           <table class="table" id="reqTable">
-            <thead><tr><th>Empleado</th><th>Fecha</th><th>Hora inicio</th><th>Hora fin</th><th>Solicitada</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Empleado</th><th>Fecha</th><th>Hora inicio</th><th>Hora fin</th><th>Inicio descanso</th><th>Fin descanso</th><th>Solicitada</th><th>Acciones</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -125,6 +142,13 @@
           <h2>Solicitudes de vacaciones pendientes</h2>
           <table class="table" id="vacTable">
             <thead><tr><th>Empleado</th><th>Fecha inicio</th><th>Fecha fin</th><th>Días</th><th>Solicitada</th><th>Acciones</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <h2>Vacaciones empleados</h2>
+          <table class="table" id="vacAcceptedTable">
+            <thead><tr><th>Empleado</th><th>Fecha inicio</th><th>Fecha fin</th><th>Días</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>

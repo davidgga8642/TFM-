@@ -100,3 +100,17 @@ vacations.post('/:id/reject', requireAuth, requireRole('ADMIN'), async (req,res)
   await q.run(`UPDATE vacation_requests SET status='RECHAZADO', reason=?, approved_by=? WHERE id=?`, [reason || '', req.session.user.id, id])
   res.json({ ok:true, message:'Vacaciones rechazadas' })
 })
+
+// Admin: list accepted vacations
+vacations.get('/accepted', requireAuth, requireRole('ADMIN'), async (req,res)=>{
+  const rows = await q.all(`SELECT vr.*, u.email FROM vacation_requests vr JOIN users u ON vr.user_id=u.id WHERE vr.status='ACEPTADO' ORDER BY vr.start_date DESC`)
+  const mapped = rows.map(r=>({
+    id: r.id,
+    user_id: r.user_id,
+    email: r.email,
+    start_date: r.start_date,
+    end_date: r.end_date,
+    created_at: r.created_at
+  }))
+  res.json({ requests: mapped })
+})

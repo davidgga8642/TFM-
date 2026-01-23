@@ -11,6 +11,7 @@ auth.post('/login', async (req,res)=>{
   if(!email || !password) return res.status(400).json({ error: 'Email y contraseña requeridos' })
   const user = await q.get(`SELECT * FROM users WHERE email=?`, [email])
   if(!user) return res.status(401).json({ error: 'Credenciales inválidas' })
+  if(user.active===0) return res.status(403).json({ error: 'Cuenta desactivada' })
   const ok = await bcrypt.compare(password, user.password_hash)
   if(!ok) return res.status(401).json({ error: 'Credenciales inválidas' })
   req.session.user = { id: user.id, email: user.email, role: user.role, company_id: user.company_id }

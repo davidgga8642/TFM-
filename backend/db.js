@@ -62,7 +62,8 @@ export async function init(){
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('ADMIN','WORKER')),
-    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    active INTEGER DEFAULT 1
   )`)
 
   await run(`CREATE TABLE IF NOT EXISTS employees(
@@ -122,6 +123,16 @@ export async function init(){
     salaries REAL NOT NULL
   )`)
 
+  await run(`CREATE TABLE IF NOT EXISTS invoices(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_name TEXT NOT NULL,
+    amount REAL NOT NULL,
+    month TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    file_mime TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`)
+
   await run(`CREATE TABLE IF NOT EXISTS countries(
     code TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -143,11 +154,16 @@ export async function init(){
     date TEXT NOT NULL,
     start_time TEXT NOT NULL,
     end_time TEXT NOT NULL,
+    break_start TEXT,
+    break_end TEXT,
     status TEXT DEFAULT 'PENDIENTE',
     reason TEXT,
     created_at TEXT NOT NULL,
     approved_by INTEGER REFERENCES users(id) ON DELETE SET NULL
   )`)
+
+  await ensureColumn('timesheet_requests', 'break_start', 'break_start TEXT')
+  await ensureColumn('timesheet_requests', 'break_end', 'break_end TEXT')
 
   await run(`CREATE TABLE IF NOT EXISTS vacation_requests(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,6 +184,9 @@ export async function init(){
   await ensureColumn('employees','allow_lodging','allow_lodging INTEGER DEFAULT 1')
   await ensureColumn('employees','vacation_days_used','vacation_days_used INTEGER DEFAULT 0')
   await ensureColumn('employees','vacation_year','vacation_year INTEGER DEFAULT 2026')
+  await ensureColumn('users','active','active INTEGER DEFAULT 1')
+  await ensureColumn('employees','hire_date','hire_date TEXT')
+  await ensureColumn('employees','termination_date','termination_date TEXT')
 
   // Seed
   const anyCompany = await get(`SELECT * FROM companies LIMIT 1`)

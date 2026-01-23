@@ -42,8 +42,56 @@ finance.get('/entries', requireAuth, requireRole('ADMIN'), async (req,res)=>{
 })
 finance.get('/summary', requireAuth, requireRole('ADMIN'), async (req,res)=>{
   const rows = await q.all(`SELECT month, SUM(incomes) as incomes, SUM(expenses) as expenses, SUM(salaries) as salaries FROM finance_entries GROUP BY month ORDER BY month`)
-  const months = rows.map(r=>r.month)
-  const incomes = rows.map(r=>round2(r.incomes)), expenses = rows.map(r=>round2(r.expenses)), salaries = rows.map(r=>round2(r.salaries))
+  const ticketRows = await q.all(`SELECT substr(created_at,1,7) as month, SUM(amount) as amount FROM tickets WHERE status='APROBADO' GROUP BY substr(created_at,1,7) ORDER BY month`)
+  const invRows = await q.all(`SELECT month, SUM(amount) as amount FROM invoices GROUP BY month ORDER BY month`)
+  const otUserRows = await q.all(`
+    SELECT 
+      u.email AS email,
+      substr(t.date,1,7) AS month,
+      SUM(
+        CASE 
+          WHEN t.start_time IS NOT NULL AND t.end_time IS NOT NULL THEN 
+            (
+              CASE 
+                WHEN (
+                  (
+                    (
+                      (strftime('%s', t.end_time) - strftime('%s', t.start_time))
+                      - CASE WHEN t.break_start IS NOT NULL AND t.break_end IS NOT NULL THEN (strftime('%s', t.break_end) - strftime('%s', t.break_start)) ELSE 0 END
+                    ) / 3600.0
+                  )
+                ) > COALESCE(e.daily_hours, 8)
+                THEN (
+                  (
+                    (strftime('%s', t.end_time) - strftime('%s', t.start_time))
+                    - CASE WHEN t.break_start IS NOT NULL AND t.break_end IS NOT NULL THEN (strftime('%s', t.break_end) - strftime('%s', t.break_start)) ELSE 0 END
+                  ) / 3600.0
+                ) - COALESCE(e.daily_hours, 8)
+                ELSE 0
+              END
+            )
+          ELSE 0 
+        END
+      ) AS hours
+    FROM timesheets t 
+    JOIN users u ON u.id = t.user_id 
+    LEFT JOIN employees e ON e.user_id = u.id
+    GROUP BY u.email, substr(t.date,1,7) 
+    ORDER BY month
+  `)
+  const months = Array.from(new Set([...(rows.map(r=>r.month)), ...(invRows.map(r=>r.month)), ...(ticketRows.map(r=>r.month)), ...(otUserRows.map(r=>r.month))])).sort()
+  const finMap = new Map(rows.map(r=>[r.month, r]))
+  const invMap = new Map(invRows.map(r=>[r.month, round2(r.amount)]))
+  const tickMap = new Map(ticketRows.map(r=>[r.month, round2(r.amount)]))
+  const finance_incomes = months.map(m=> round2(finMap.get(m)?.incomes || 0))
+  const incomes = months.map(m=> round2((finMap.get(m)?.incomes || 0) + (invMap.get(m) || 0)))
+  const ticket_expenses = months.map(m=> round2(tickMap.get(m) || 0))
+  const expenses = months.map(m=> round2((finMap.get(m)?.expenses || 0) + (tickMap.get(m) || 0)))
+  // Active employees salaries (current active users)
+  const activeSalaryRows = await q.all(`SELECT salary FROM employees e JOIN users u ON u.id=e.user_id WHERE u.active=1`)
+  const activeSalarySum = activeSalaryRows.reduce((a,r)=> a + (r.salary||0), 0)
+  const salaries = months.map(m=> round2(finMap.get(m)?.salaries || 0))
+  const active_salaries = months.map(()=> round2(activeSalarySum))
   const gross = months.map((_,i)=> round2(incomes[i]-expenses[i]-salaries[i]))
   let taxRate = 0.25
   const latest = await q.get(`SELECT country_code FROM finance_entries ORDER BY id DESC LIMIT 1`)
@@ -53,8 +101,20 @@ finance.get('/summary', requireAuth, requireRole('ADMIN'), async (req,res)=>{
   const empRows = await q.all(`SELECT salary FROM employees`)
   const empSalariesTotal = empRows.reduce((a,r)=> a + (r.salary||0), 0)
   const emp_salaries = months.map(()=> round2(empSalariesTotal))
-  const ot = await q.all(`SELECT substr(date,1,7) as month, SUM(CASE WHEN end_time IS NOT NULL THEN (julianday(end_time)-julianday(start_time))*24 ELSE 0 END) as hours FROM timesheets GROUP BY month ORDER BY month`)
-  const overtime = months.map(m=>{ const r=ot.find(x=>x.month===m); const h=r? (r.hours||0):0; const days=h>0? Math.ceil(h/8):0; const extra=Math.max(0,h-days*8); return round2(extra) })
-  res.json({ months, series:{ incomes, expenses, salaries, emp_salaries, gross, taxes, net, overtime } })
+  const overtime_by_employee = otUserRows.map(r=>({ email: r.email, month: r.month, hours: round2(r.hours || 0) }))
+  // Total overtime per month (summing employees)
+  const overtime = months.map(m=>{
+    const sum = overtime_by_employee.filter(o=>o.month===m).reduce((a,b)=> a + b.hours, 0)
+    return round2(sum)
+  })
+  const invoice_incomes = months.map(m=> invMap.get(m) || 0)
+  res.json({ months, series:{ incomes, finance_incomes, expenses, ticket_expenses, salaries, active_salaries, emp_salaries, gross, taxes, net, overtime, overtime_by_employee, invoice_incomes } })
+})
+
+finance.post('/reset', requireAuth, requireRole('ADMIN'), async (req,res)=>{
+  await q.run(`DELETE FROM finance_entries`)
+  await q.run(`DELETE FROM invoices`)
+  await q.run(`UPDATE tickets SET status='PENDIENTE', reason=NULL WHERE status IN ('APROBADO','RECHAZADO')`)
+  res.json({ ok:true })
 })
 function round2(n){ return Math.round(n*100)/100 }

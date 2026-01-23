@@ -12,6 +12,7 @@ import { timesheets } from './routes-timesheets.js'
 import { tickets } from './routes-tickets.js'
 import { finance } from './routes-finance.js'
 import { vacations } from './routes-vacations.js'
+import { invoices } from './routes-invoices.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -41,6 +42,7 @@ app.use('/api/timesheets', timesheets)
 app.use('/api/tickets', tickets)
 app.use('/api/finance', finance)
 app.use('/api/vacations', vacations)
+app.use('/api/invoices', invoices)
 
 const PORT = process.env.PORT || 3000
 init().then(async ()=>{
