@@ -17,7 +17,7 @@ function activateTab(id){
   for(const k in sections){ sections[k].style.display = (k===id)? 'block':'none' }
   if(id==='expenses') listExpenses()
   if(id==='requests') loadRequests()
-  if(id==='vacations'){ loadVacationRequests(); loadAcceptedVacations() }
+  if(id==='vacations'){ loadVacationRequests(); loadAcceptedVacations(); initVacationCalendar() }
   if(id==='invoices') listInvoices()
 }
 
@@ -29,14 +29,41 @@ async function init(){
   el('#cSave').addEventListener('click', saveCompany)
   loadCompany()
   el('#invSave').addEventListener('click', saveInvoice)
+  setupEmployeeSearch()
+  setupExportModal()
 }
 init().catch(e=> alert(e.message))
 
-async function listEmployees(){
-  const r = await api('api/employees')
+// --- Employee search and pagination ---
+let allEmployees = []
+let empCurrentPage = 1
+const empPageSize = 15
+
+function setupEmployeeSearch(){
+  el('#empSearchBtn').addEventListener('click', ()=>{ empCurrentPage = 1; renderEmployees() })
+  el('#empSearch').addEventListener('keyup', ()=>{ empCurrentPage = 1; renderEmployees() })
+  el('#empPrevBtn').addEventListener('click', ()=>{ if(empCurrentPage > 1) empCurrentPage--; renderEmployees() })
+  el('#empNextBtn').addEventListener('click', ()=>{ const totalPages = Math.ceil(getFilteredEmployees().length / empPageSize); if(empCurrentPage < totalPages) empCurrentPage++; renderEmployees() })
+}
+
+function getFilteredEmployees(){
+  const query = el('#empSearch').value.toLowerCase().trim()
+  return allEmployees.filter(e=> !query || e.email.toLowerCase().includes(query))
+}
+
+function renderEmployees(){
+  const filtered = getFilteredEmployees()
+  const totalPages = Math.ceil(filtered.length / empPageSize)
+  if(empCurrentPage > totalPages) empCurrentPage = Math.max(1, totalPages)
+  
+  const start = (empCurrentPage - 1) * empPageSize
+  const end = start + empPageSize
+  const pageEmployees = filtered.slice(start, end)
+  
   const tbody = document.querySelector('#empTable tbody')
   tbody.innerHTML = ''
-  r.employees.forEach(e=>{
+  
+  pageEmployees.forEach(e=>{
     const tr = document.createElement('tr')
     tr.innerHTML = `<td>${e.email}</td><td>${fmtMoney(e.overtime_rate)}</td><td>${fmtMoney(e.salary)}</td><td>${e.allow_diets?'Dietas':''} ${e.allow_transport?'Transporte':''}</td><td>${e.active? 'Activo':'Baja'}</td>`
     const tdAct = document.createElement('td')
@@ -63,6 +90,17 @@ async function listEmployees(){
     tr.appendChild(tdAct)
     tbody.appendChild(tr)
   })
+  
+  el('#empPageInfo').textContent = `Página ${empCurrentPage} de ${totalPages || 1}`
+  el('#empPrevBtn').disabled = empCurrentPage <= 1
+  el('#empNextBtn').disabled = empCurrentPage >= totalPages
+}
+
+async function listEmployees(){
+  const r = await api('api/employees')
+  allEmployees = r.employees
+  empCurrentPage = 1
+  renderEmployees()
 }
 
 async function deactivateEmployee(empId){
@@ -188,10 +226,10 @@ async function listExpenses(){
     tr.appendChild(tdPdf)
     
     const td = document.createElement('td')
-    const btnA = document.createElement('button'); btnA.className='btn'; btnA.textContent='Aprobar'; btnA.onclick = async ()=>{ await api('api/tickets/'+t.id+'/approve', { method:'PATCH', body: JSON.stringify({}) }); document.getElementById('expFilter').value='PENDIENTE'; listExpenses() }
+    const btnA = document.createElement('button'); btnA.className='btn btn-approve'; btnA.textContent='Aprobar'; btnA.onclick = async ()=>{ await api('api/tickets/'+t.id+'/approve', { method:'PATCH', body: JSON.stringify({}) }); document.getElementById('expFilter').value='PENDIENTE'; listExpenses() }
     const inp = document.createElement('input'); inp.className='input'; inp.placeholder='Motivo rechazo'; inp.style.maxWidth='200px'
-    const btnR = document.createElement('button'); btnR.className='btn'; btnR.textContent='Rechazar'; btnR.onclick = async ()=>{ if(!inp.value) return alert('Motivo requerido'); await api('api/tickets/'+t.id+'/reject', { method:'PATCH', body: JSON.stringify({ reason: inp.value }) }); document.getElementById('expFilter').value='PENDIENTE'; listExpenses() }
-    td.append(btnA, inp, btnR); tr.appendChild(td)
+    const btnR = document.createElement('button'); btnR.className='btn btn-reject'; btnR.textContent='Rechazar'; btnR.onclick = async ()=>{ if(!inp.value) return alert('Motivo requerido'); await api('api/tickets/'+t.id+'/reject', { method:'PATCH', body: JSON.stringify({ reason: inp.value }) }); document.getElementById('expFilter').value='PENDIENTE'; listExpenses() }
+    td.append(btnR, inp, btnA); tr.appendChild(td)
     tbody.appendChild(tr)
   })
 
@@ -225,7 +263,7 @@ async function loadRequests(){
       tr.innerHTML = `<td>${req.email}</td><td>${req.date}</td><td>${req.start_time}</td><td>${req.end_time}</td><td>${!req.break_start ? '—' : req.break_start}</td><td>${!req.break_end ? '—' : req.break_end}</td><td>${new Date(req.created_at).toLocaleString()}</td>`
       const td = document.createElement('td')
       const btnA = document.createElement('button')
-      btnA.className = 'btn'
+      btnA.className = 'btn btn-approve'
       btnA.textContent = 'Aceptar'
       btnA.onclick = async ()=>{
         await api('api/timesheets/requests/'+req.id+'/approve', { method:'POST', body: JSON.stringify({}) })
@@ -237,7 +275,7 @@ async function loadRequests(){
       inp.placeholder = 'Motivo rechazo'
       inp.style.maxWidth = '200px'
       const btnR = document.createElement('button')
-      btnR.className = 'btn'
+      btnR.className = 'btn btn-reject'
       btnR.textContent = 'Rechazar'
       btnR.onclick = async ()=>{
         if(!inp.value) return alert('Motivo requerido')
@@ -245,7 +283,7 @@ async function loadRequests(){
         alert('Solicitud rechazada')
         loadRequests()
       }
-      td.append(btnA, inp, btnR)
+      td.append(btnR, inp, btnA)
       tr.appendChild(td)
       tbody.appendChild(tr)
     })
@@ -355,5 +393,152 @@ async function saveInvoice(){
   await listInvoices()
   await loadChartsAndKpis()
   alert('Factura guardada')
+}
+
+// --- Export employee data to Excel ---
+function setupExportModal(){
+  el('#exportInfoBtn').addEventListener('click', showExportModal)
+  el('#exportCancelBtn').addEventListener('click', ()=> el('#exportModal').style.display = 'none')
+  el('#exportConfirmBtn').addEventListener('click', generateExcel)
+}
+
+function showExportModal(){
+  const modal = el('#exportModal')
+  const list = el('#exportEmployeeList')
+  list.innerHTML = ''
+  
+  allEmployees.forEach(emp=>{
+    const div = document.createElement('div')
+    div.className = 'checkbox-item'
+    div.innerHTML = `
+      <input type="checkbox" id="emp-${emp.id}" value="${emp.id}">
+      <label for="emp-${emp.id}">${emp.email}</label>
+    `
+    list.appendChild(div)
+  })
+  
+  modal.style.display = 'flex'
+}
+
+async function generateExcel(){
+  const checkboxes = document.querySelectorAll('#exportEmployeeList input[type="checkbox"]:checked')
+  if(checkboxes.length === 0){
+    alert('Selecciona al menos un empleado')
+    return
+  }
+  
+  const employeeIds = Array.from(checkboxes).map(cb=> cb.value)
+  
+  // Obtener datos del backend
+  const results = await Promise.all(
+    employeeIds.map(id=> api(`api/employees/${id}/stats`))
+  )
+  
+  // Crear datos para Excel
+  const data = [
+    ['', 'Dias trabajados', 'Total gastos', 'Dias libres', 'Tickets aceptados', 'Tickets rechazados']
+  ]
+  
+  results.forEach(stat=>{
+    data.push([
+      stat.email,
+      stat.days_worked,
+      `€${stat.total_expenses.toFixed(2)}`,
+      stat.vacation_days,
+      stat.tickets_approved,
+      stat.tickets_rejected
+    ])
+  })
+  
+  // Generar Excel
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.aoa_to_sheet(data)
+  XLSX.utils.book_append_sheet(wb, ws, 'Estadísticas')
+  XLSX.writeFile(wb, `empleados_${new Date().toISOString().split('T')[0]}.xlsx`)
+  
+  el('#exportModal').style.display = 'none'
+  alert('Excel generado correctamente')
+}
+
+// --- Vacation Calendar ---
+const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#d946ef', '#ec4899', '#14b8a6']
+let employeeColors = {}
+let calendarInstance = null
+
+function getEmployeeColor(email){
+  if(!employeeColors[email]){
+    const colorIndex = Object.keys(employeeColors).length % colors.length
+    employeeColors[email] = colors[colorIndex]
+  }
+  return employeeColors[email]
+}
+
+async function initVacationCalendar(){
+  const calendarEl = document.getElementById('vacationCalendar')
+  if(!calendarEl) {
+    console.error('Contenedor del calendario no encontrado')
+    return
+  }
+  
+  // Limpiar eventos previos
+  employeeColors = {}
+  
+  try {
+    console.log('Cargando vacaciones aceptadas...')
+    const res = await api('api/vacations/accepted')
+    const vacations = res.requests || []
+    console.log('Vacaciones cargadas:', vacations)
+    
+    // Crear eventos para el calendario
+    const events = vacations.map(vac => {
+      const color = getEmployeeColor(vac.email)
+      const startDate = vac.start_date
+      const endDate = new Date(new Date(vac.end_date).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      console.log(`Evento: ${vac.email} de ${startDate} a ${endDate}`)
+      return {
+        title: vac.email,
+        start: startDate,
+        end: endDate,
+        backgroundColor: color,
+        borderColor: color,
+        textColor: '#fff',
+        extendedProps: {
+          email: vac.email
+        }
+      }
+    })
+    
+    // Destruir calendario anterior si existe
+    if(calendarInstance){
+      calendarInstance.destroy()
+    }
+    
+    // Limpiar el contenedor
+    calendarEl.innerHTML = ''
+    
+    // Crear nuevo calendario
+    console.log('Inicializando FullCalendar con', events.length, 'eventos')
+    calendarInstance = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      locale: 'es',
+      height: 'auto',
+      contentHeight: 'auto',
+      events: events,
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,dayGridWeek'
+      },
+      eventClick: function(info){
+        alert(`${info.event.title}\n${info.event.start.toLocaleDateString()} - ${new Date(info.event.end.getTime() - 1).toLocaleDateString()}`)
+      }
+    })
+    
+    calendarInstance.render()
+    console.log('Calendario renderizado exitosamente')
+  } catch(e) {
+    console.error('Error loading vacation calendar:', e)
+    alert('Error cargando calendario: ' + e.message)
+  }
 }
 

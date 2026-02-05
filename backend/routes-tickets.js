@@ -116,7 +116,10 @@ tickets.patch('/:id/reject', requireAuth, requireRole('ADMIN'), async (req,res)=
 })
 
 // Download file (admin only)
-tickets.get('/:id/file', requireAuth, requireRole('ADMIN'), async (req,res)=>{
+tickets.get('/:id/file', async (req,res)=>{
+  // Check authorization first (return 403 for any non-admin)
+  if(req.session?.user?.role !== 'ADMIN') return res.status(403).json({ error:'Acceso denegado' })
+  
   const id = Number(req.params.id)
   if(!Number.isFinite(id)) return res.status(400).json({ error:'ID inválido' })
   const ticket = await q.get(`SELECT file_path, file_mime FROM tickets WHERE id=?`, [id])

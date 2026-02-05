@@ -77,3 +77,42 @@ employees.patch('/:id/activate', requireAuth, requireRole('ADMIN'), async (req,r
   await q.run(`UPDATE users SET active=1 WHERE id=?`, [emp.user_id])
   res.json({ ok:true })
 })
+
+// Employee statistics for export
+employees.get('/:id/stats', requireAuth, requireRole('ADMIN'), async (req,res)=>{
+  const id = Number(req.params.id)
+  if(!Number.isFinite(id)) return res.status(400).json({ error:'ID inválido' })
+  
+  const emp = await q.get(`SELECT e.*, u.email FROM employees e JOIN users u ON u.id=e.user_id WHERE e.id=?`, [id])
+  if(!emp) return res.status(404).json({ error:'Empleado no encontrado' })
+  
+  const userId = emp.user_id
+  
+  // Días trabajados (días únicos con timesheets)
+  const daysWorked = await q.get(`SELECT COUNT(DISTINCT date) as count FROM timesheets WHERE user_id=?`, [userId])
+  
+  // Total gastos aceptados
+  const totalExpenses = await q.get(`SELECT COALESCE(SUM(amount), 0) as total FROM tickets WHERE user_id=? AND status='APROBADO'`, [userId])
+  
+  // Días de vacaciones (vacaciones aceptadas) - calculamos desde start_date y end_date
+  const vacations = await q.all(`SELECT start_date, end_date FROM vacation_requests WHERE user_id=? AND status='ACEPTADO'`, [userId])
+  const vacationDays = vacations.reduce((total, vac) => {
+    const start = new Date(vac.start_date)
+    const end = new Date(vac.end_date)
+    const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
+    return total + days
+  }, 0)
+  
+  // Tickets aceptados y rechazados
+  const ticketsApproved = await q.get(`SELECT COUNT(*) as count FROM tickets WHERE user_id=? AND status='APROBADO'`, [userId])
+  const ticketsRejected = await q.get(`SELECT COUNT(*) as count FROM tickets WHERE user_id=? AND status='RECHAZADO'`, [userId])
+  
+  res.json({
+    email: emp.email,
+    days_worked: daysWorked.count || 0,
+    total_expenses: totalExpenses.total || 0,
+    vacation_days: vacationDays || 0,
+    tickets_approved: ticketsApproved.count || 0,
+    tickets_rejected: ticketsRejected.count || 0
+  })
+})

@@ -6,6 +6,9 @@
     <title>TFM – Panel Empresa</title>
     <link rel="stylesheet" href="css/styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
   </head>
   <body>
     <nav class="nav">
@@ -54,13 +57,23 @@
           <div class="card">
             <h2>Acciones</h2>
             <a class="btn" href="admin-employee-new.html">Crear empleado</a>
+            <button id="exportInfoBtn" class="btn primary" style="margin-top:8px"> Extraer info</button>
           </div>
           <div class="card" style="grid-column: span 2">
             <h2>Empleados</h2>
+            <div style="margin-bottom:12px; display:flex; gap:8px; align-items:center">
+              <input id="empSearch" class="input" placeholder=" Buscar empleado..." style="max-width:300px" />
+              <button id="empSearchBtn" class="btn">Buscar</button>
+            </div>
             <table class="table" id="empTable">
               <thead><tr><th>Email</th><th>Tarifa OT</th><th>Salario</th><th>Permisos</th><th>Estado</th><th>Acciones</th></tr></thead>
               <tbody></tbody>
             </table>
+            <div style="margin-top:12px; display:flex; gap:8px; align-items:center; justify-content:center">
+              <button id="empPrevBtn" class="btn">← Anterior</button>
+              <span id="empPageInfo" style="font-size:12px">Página 1</span>
+              <button id="empNextBtn" class="btn">Siguiente →</button>
+            </div>
           </div>
         </div>
       </section>
@@ -138,7 +151,7 @@
 
       <!-- Vacations -->
       <section id="tab-vacations" style="display:none">
-        <div class="card">
+        <div class="card" style="margin-top:12px">
           <h2>Solicitudes de vacaciones pendientes</h2>
           <table class="table" id="vacTable">
             <thead><tr><th>Empleado</th><th>Fecha inicio</th><th>Fecha fin</th><th>Días</th><th>Solicitada</th><th>Acciones</th></tr></thead>
@@ -151,6 +164,10 @@
             <thead><tr><th>Empleado</th><th>Fecha inicio</th><th>Fecha fin</th><th>Días</th></tr></thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div class="card">
+          <h2>Calendario de vacaciones</h2>
+          <div id="vacationCalendar"></div>
         </div>
       </section>
 
@@ -166,9 +183,21 @@
           <p class="small">Radio de validación para fichaje: 200 m.</p>
         </div>
       </section>
-
-      <footer>© TFM Empresas</footer>
     </main>
+
+    <!-- Modal de exportación -->
+    <div id="exportModal" class="modal" style="display:none">
+      <div class="modal-content" style="max-width:500px">
+        <h2>Seleccionar empleados para exportar</h2>
+        <div id="exportEmployeeList" style="max-height:400px; overflow-y:auto; margin:16px 0">
+          <!-- Lista de empleados con checkboxes -->
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end">
+          <button id="exportCancelBtn" class="btn">Cancelar</button>
+          <button id="exportConfirmBtn" class="btn primary">Generar Excel</button>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="js/admin.js"></script>
   </body>

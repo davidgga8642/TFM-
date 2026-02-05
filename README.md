@@ -202,3 +202,37 @@ David Gómez García-Arias
 	- Iniciar backend (`npm start`) y acceder a `http://localhost:3000/admin.html`.
 	- Usar usuario ADMIN/CEO para acceder a gastos y gráficas financieras.
 
+## 📋 Changelog
+
+### [05-02-2026] David
+- ✅ **Exportación de datos de empleados**
+  - Botón "📊 Extraer info" en sección de empleados
+  - Modal con selección de empleados mediante checkboxes
+  - Generación automática de Excel con 6 columnas:
+    * Nombre usuario
+    * Días trabajados (jornadas registradas)
+    * Total gastos aceptados (€)
+    * Días libres (vacaciones aceptadas)
+    * Tickets aceptados
+    * Tickets rechazados
+  - Descarga automática con fecha: `empleados_YYYY-MM-DD.xlsx`
+
+- ✅ **Calendario interactivo de vacaciones**
+  - Implementado FullCalendar en pestaña "Solicitudes vacaciones"
+  - Muestra todas las vacaciones aceptadas
+  - Colores asignados dinámicamente a cada empleado
+  - Vistas disponibles: Mensual y Semanal
+  - Navegación: anterior/siguiente/hoy
+  - Click en evento muestra detalles (email y fechas)
+
+- ✅ **Correcciones backend**
+  - Nuevo endpoint `GET /api/employees/:id/stats` para estadísticas de empleado
+  - Corrección de consultas SQL: uso de `user_id` en lugar de `employee_id`
+  - Cálculo dinámico de días de vacaciones desde `start_date` y `end_date`
+  - Integración con tabla `vacation_requests` y `timesheets`
+
+- ✅ **Mejoras visuales**
+  - Estilos CSS específicos para FullCalendar
+  - Modal de selección con diseño mejorado
+  - Checkbox items con hover y label clickeable
+
